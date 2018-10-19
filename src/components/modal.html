@@ -1,0 +1,172 @@
+<div class="modal fade" id="modal" tabindex="-1" role="dialog" aria-labelledby="modal-label" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modal-label">{title}</h5>
+        <button type="button" class="close" data-dismiss="modal">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <svelte:component this={ComponentLink} formStore={formStore}/>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Отмена</button>
+        <button type="button" class="btn btn-success" on:click="createModel()">Сохранить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+    import VkGroupsForm from '../forms/vkGroups.html';
+    import PackagesForm from '../forms/packages.html';
+    import OrderForm from '../forms/orders.html';
+    import AuthForm from '../forms/auth.html';
+    import UsersForm from '../forms/users.html';
+    import nativeToast from 'native-toast';
+    import PhalconApi from '../phalconApi.js';
+    
+	export default {
+        components: { VkGroupsForm, PackagesForm, OrderForm },
+        
+        computed: {
+            ComponentLink: ({ component }) => {
+				if (component === 'VkGroupsForm') return VkGroupsForm;
+				if (component === 'PackagesForm') return PackagesForm;
+				if (component === 'AuthForm') return AuthForm;
+                if (component === 'OrderForm') return OrderForm;
+                if (component === 'UsersForm') return UsersForm;
+			}
+        },
+
+		oncreate() {
+            const self = this;
+
+            $('#modal').modal('show');
+            $('#modal').on('hidden.bs.modal', function () {
+                self.close();
+            })
+        },
+        
+        ondestroy() {
+            
+        },
+
+        methods: {
+            close(){
+                const { formStore } = this.get();
+
+                formStore.set({ isClose: true });
+                this.destroy();
+            },
+			createModel() {
+                var { component, formStore } = this.get();
+                
+
+                if(component == 'VkGroupsForm'){
+                    var { vkGroupId, name, screenName, avatar, fetchGroupList, vkGroup } = formStore.get();
+
+                    if(vkGroup){
+                        PhalconApi.vkGroups.update(vkGroup.id, vkGroup).then(response => {
+                            if(response.status == 200) this.options.root.toast('success', 'Группа успешно обновлена!');
+                            formStore.set({ isLoad: true });
+                            $('#modal').modal('hide');
+                        });
+                    } else
+
+                    if(fetchGroupList && fetchGroupList.length > 0){
+                        PhalconApi.vkGroups.insert(fetchGroupList).then(status => {
+                            if(status == 200) this.options.root.toast('success', 'Группы успешно добавлены!');
+                            formStore.set({ isLoad: true });
+                            $('#modal').modal('hide');
+                        });
+                    } else
+                    
+                    if(vkGroupId){
+                        var data = { vkGroupId, name, screenName, avatar };
+                        PhalconApi.vkGroups.create(data).then(status => {
+                            if(status == 200) this.options.root.toast('success', 'Группы успешно добавлены!');
+                            formStore.set({ isLoad: true });
+                            $('#modal').modal('hide');
+                        });
+                    }
+                }
+
+                if(component == 'PackagesForm'){
+                    console.log('PackagesForm save', PackagesForm);
+                    var { name, price, groups, component } = formStore.get();
+
+                    PhalconApi.packages.create({ name, price, groups }).then(status => {
+                        if(status == 200) this.options.root.toast('success', 'Группы успешно добавлены!');
+                        formStore.set({ isLoad: true });
+                        $('#modal').modal('hide');
+                    });
+                }
+
+                if(component == 'AuthForm'){
+                    var { email, password } = formStore.get();
+                    PhalconApi.session.start({ email, password }).then(status => {
+                        console.log(status);
+                        if(status == 404) { 
+                            this.options.root.toast('danger', 'Пользователь не найден!');
+                        } else 
+
+                        if(status == 401) {
+                            this.options.root.toast('danger', 'Неверный пароль!');
+                        } else
+
+                        if(status == 200) {
+                            this.options.root.toast('success', 'Авторизация прошла успешно!');
+                            setTimeout(function(){
+                                window.location.replace("/vk-groups");
+                            }, 1000);
+                        } else {
+                            this.options.root.toast('danger', 'Ошибка, обратитесь к администратору!');
+                        }
+                    });
+                }
+
+                if(component == 'OrderForm'){
+                    const { order } = formStore.get();
+                    if(order.id){
+                        PhalconApi.orders.update(order.id, order).then(response => {
+                            if(response.status == 200) this.options.root.toast('success', 'Заказ успешно обновлен!');
+                            else this.options.root.toast('danger', 'Ошибка, обратитесь к администратору!');
+
+                            formStore.set({ isLoad: true });
+                            $('#modal').modal('hide');
+                        });
+                    } else {
+                        PhalconApi.orders.create(order).then(status => {
+                            if(status == 200) this.options.root.toast('success', 'Заказ создан успешно!');
+                            else this.options.root.toast('danger', 'Ошибка, обратитесь к администратору!');
+
+                            formStore.set({ isLoad: true });
+                            $('#modal').modal('hide');
+                        });
+                    }
+                }
+
+                if(component == 'UsersForm'){
+                    const { user, isCorrect } = formStore.get();
+                    if(isCorrect){
+                        PhalconApi.users.create(user).then(status => {
+                            if(status == 200) this.options.root.toast('success', 'Пользователь создан успешно!');
+                            else this.options.root.toast('danger', 'Ошибка, обратитесь к администратору!');
+                        });
+                    } else {
+                        this.options.root.toast('danger', 'Есть ошибки в заполнении!');
+                    }
+                }
+            }
+        }
+	};
+</script>
+
+<style>
+    .modal-header{
+        border-bottom: 0;
+        padding-bottom: 0;
+    }
+</style>

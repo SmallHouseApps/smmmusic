@@ -1,0 +1,272 @@
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+	<a class="navbar-brand" href="/">{appName}</a>
+	<button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent"
+	 aria-expanded="false" aria-label="Toggle navigation">
+		<span class="navbar-toggler-icon"></span>
+	</button>
+
+	<div class="collapse navbar-collapse" id="navbarSupportedContent">
+		<ul class="navbar-nav mr-auto">
+			{#if rightsReady}
+				{#each Navigations as link} 
+					{#if link.dropdown}
+					<li class="nav-item dropdown">
+						<a class="nav-link dropdown-toggle" href="/{link.value}" id="navbar-{link.value}" role="button" data-toggle="dropdown" aria-haspopup="true"
+						aria-expanded="false">
+							{link.name}
+						</a>
+						<div class="dropdown-menu" aria-labelledby="navbar-{link.value}">
+							{#each link.dropdown as dropdownLink}
+							<a class="dropdown-item" href="/{link.value}{dropdownLink.value}">{dropdownLink.name}</a>
+							{/each}
+						</div>
+					</li>
+					{:else}
+					<li class="nav-item">
+						<a class="nav-link {path == '/'+link.value ? 'active' : ''}" href="/{link.value}">{link.name}</a>
+					</li>
+					{/if} 
+				{/each}
+			{/if}
+		</ul>
+		{#if rightsReady}
+		<form class="form-inline my-2 my-lg-0">
+			{#if sessionName}
+			<span style="color: white; padding-right: 15px;">Здравствуйте, {sessionName}</span>
+			<a href="/session/end" class="btn btn-outline-light">Выйти</a>
+			{:else}
+			<button type="button" class="btn btn-outline-light" on:click="set({ modal: { component: 'AuthForm', name: 'Авторизация' } })">Авторизация</button>
+			{/if}
+		</form>
+		{/if}
+	</div>
+</nav>
+
+<div class="container">
+	<div class="row">
+		{#if BreadCrumbs}
+		<div class="col-md-6">
+			<nav aria-label="breadcrumb">
+				<ol class="breadcrumb">
+					{#each BreadCrumbs as BreadCrumb}
+					<li class="breadcrumb-item {BreadCrumb.last ? 'active' : ''}"><a href="{BreadCrumb.link}">{BreadCrumb.name}</a></li>
+					<!-- <li class="breadcrumb-item active" aria-current="page">Library</li> -->
+					{/each}
+				</ol>
+			</nav>
+		</div>
+		{/if}
+		<svelte:component  this={ComponentLink} rights={rights} />
+	</div>
+</div>
+
+<div id="toast" class="{toast.type}">
+	<div id="img" class="{toast.type}">
+		{#if toast.type == 'success'}
+		<i class="material-icons">done</i>
+		{:elseif toast.type == 'warning'}
+		<i class="material-icons">warning</i>
+		{:elseif toast.type == 'danger'}
+		<i class="material-icons">close</i>
+		{/if}
+	</div>
+	<div id="desc" class="{toast.type}">{toast.text}</div>
+</div>
+
+{#if modal && modal.component}
+<Modal title="{modal.name}" component="{modal.component}" formStore={formStore} />
+{/if}
+
+{#if newOrder}
+<div class="card" id="newOrder">
+  <div class="card-body text-center">
+    <h5 class="card-title">
+		Новый заказ
+		<i class="material-icons pointer" style="position: absolute; top: 10px; right: 10px;" title="Очистить заказ" on:click="clearOrder()">close</i>
+	</h5>
+	<p class="card-text text-left">
+		{#if newOrder.vkGroups}
+			ВК-группы - {newOrder.vkGroups.length} шт.<br>
+		{/if}
+		{#if newOrder.packages}
+			Пакеты - {newOrder.packages.length} шт.<br>
+		{/if}
+		Cтоимость - {newOrder.price} руб.</p>
+    <button class="btn btn-success pulse" on:click="set({ modal: { name: 'Новый заказ', component: 'OrderForm' } })">Оформить заказ</button>
+  </div>
+</div>
+{/if}
+
+<script>
+	import VkGroups from './components/vkGroups.html';
+	import Packages from './components/packages.html';
+	import Users from './components/users.html';
+	import Orders from './components/orders.html';
+	import Modal from './components/modal.html';
+	import { Store } from 'svelte/store.js';
+	import PhalconApi from './phalconApi.js';
+
+    const formStore = new Store({
+        app: null
+	});
+
+	export default {
+		components: { VkGroups, Packages, Modal, Orders },
+
+		data() {
+            return { 
+				formStore 
+			};
+		},
+		
+		computed: {
+			Navigations: ({ links, rights }) => {
+				if(Object.keys(rights).length){
+					function modifyPathName(path){
+						var componentName;
+
+						if(path.split('-').length > 1){
+							componentName = '';
+							path.split('-').forEach(function(namePart){
+								componentName += namePart.charAt(0).toUpperCase() + namePart.slice(1);
+							});
+						} else {
+							componentName = path.charAt(0).toUpperCase() + path.slice(1);
+						}
+
+						return componentName;
+					}
+
+					links = links.map(function(link){
+						var componentName;
+
+						if(link.dropdown){
+							link.dropdown = link.dropdown.map(function(dropdownLink){
+								if(dropdownLink.value != ''){
+									var path = dropdownLink.value.split('/').pop();
+									
+									componentName = modifyPathName(path);
+									if(!rights[componentName] || rights[componentName].indexOf('index') == -1) return null;
+								}
+
+								return dropdownLink;
+							}).filter(dropdownLink => dropdownLink);
+						}
+
+						componentName = modifyPathName(link.value);
+						if(!rights[componentName] || rights[componentName].indexOf('index') == -1) return null;
+						
+						return link; 
+					}).filter(link => link);
+				}
+
+				return links;
+			},
+
+			ComponentLink: ({ componentName, rights }) => {
+				if (componentName === 'VkGroups' && rights.VkGroups) return VkGroups;
+				if (componentName === 'Packages' && rights.Packages) return Packages;
+				if (componentName === 'Users' && rights.Users) return Users;
+				if (componentName === 'Orders' && rights.Orders) return Orders;
+			},
+
+			BreadCrumbs: ({ path }) => {
+				var breadcrumbs = path.split('/');
+				
+				var link = '';
+				breadcrumbs = breadcrumbs.map(function(item, index){
+					if (index == 0) return false;
+					var newItem = {};
+					
+					link += '/' + item;
+					newItem.link = link;
+					newItem.last = false; 
+					if(item == 'vk-groups') newItem.name = 'ВК-группы';
+					if(item == 'packages') newItem.name = 'Пакеты';
+					if(item == 'users') newItem.name = 'Пользователи';
+					if(item == 'orders') newItem.name = 'Заказы';
+					if(index == breadcrumbs.length - 1) newItem.last = true; 
+
+					return newItem;
+				}).filter(breadcrumb => breadcrumb);
+				
+				console.log('breadcrumbs', breadcrumbs);
+				if(breadcrumbs[0] && breadcrumbs[0].link == '/') breadcrumbs = null;
+
+				return breadcrumbs;
+			}
+		},
+
+		oncreate() {
+			formStore.on('state', ({ changed, current }) => {
+                if (changed.isLoad) {
+                    formStore.set({ isLoad: false });
+                }
+
+                if(changed.isClose){
+                    this.set({ modal: null });
+                    formStore.set({ isClose: false });
+                }
+			});
+			
+			PhalconApi.session.get().then(session => {
+				const path = window.location.pathname.split('/').pop();
+				const componentName = this.modifyPathName(path);
+				const rights = JSON.parse(session.rights);
+				const rightsReady = true;
+				const sessionName = session.name;
+				
+				this.set({ componentName, rights, rightsReady, sessionName, session });
+			});
+		},
+
+		methods: {
+			toast(type, text) {
+				this.set({ toast: {type, text} });
+				var x = document.getElementById("toast")
+				x.classList.add("show");
+				setTimeout(function(){ x.className = x.className.replace("show", ""); }, 5000);
+			},
+
+			modifyPathName(path) {
+				var componentName;
+
+				if(path.split('-').length > 1){
+					componentName = '';
+					path.split('-').forEach(function(namePart){
+						componentName += namePart.charAt(0).toUpperCase() + namePart.slice(1);
+					});
+				} else {
+					componentName = path.charAt(0).toUpperCase() + path.slice(1);
+				}
+
+				return componentName;
+			},
+
+			clearOrder() {
+				var { componentName, newOrder } = this.get();
+				newOrder = null; localStorage.setItem('newOrder', newOrder);
+
+				window.location.reload();
+			}
+		}
+	};
+</script>
+
+<style>
+	nav{
+		margin-bottom: 25px;
+	}
+
+	#newOrder{
+		position: fixed;
+		bottom: 15px; right: 15px; 
+		width: 250px;
+		transition: transform 250ms;
+		transform: translateY(72%);
+	}
+
+	#newOrder:hover{
+		transform: translateY(0) !important;
+	}
+</style>

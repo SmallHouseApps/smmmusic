@@ -1,0 +1,141 @@
+<div class="col-md-6" style="padding-top: 3px">
+    {#if rights.Orders.indexOf('create') != -1}
+    <button type="button" class="btn btn-success" on:click="set({ modal: { name: 'Новый заказ', component: 'OrderForm' } })">
+        Оформить заказ
+    </button>
+    {/if}
+</div>
+
+<div class="col-md-12">
+    {#if orders.length > 0}
+    <Table 
+        columns={table.columns} 
+        items={orders} 
+        actions={table.actions} 
+        store={table.store} 
+        rights={rights.Orders}
+        defaultFilter={table.defaultFilter}
+        hiddenTfoot={table.hiddenTfoot} /> 
+    {:else}
+    <h2 class="text-center">--ПУСТО--</h2>
+    {/if}
+
+    {#if modal && modal.component}
+    <Modal title="{modal.name}" component="{modal.component}" formStore={formStore} />
+    {/if}
+</div>
+
+<script>
+    import Modal from './modal.html';
+    import Table from './table.html';
+
+    import { Store } from 'svelte/store.js';
+    import PhalconApi from '../phalconApi.js';
+
+    const tableStore = new Store();
+    const formStore = new Store();
+    
+    export default {
+        components: { Modal, Table },
+        data() {
+            return {
+                orders: [],
+                table: {
+                    columns: [{
+                        name: '№',
+                        value: 'id',
+                        width: 70
+                    }, {
+                        name: 'Заказчик',
+                        value: 'user',
+                        prop: 'name'
+                    }, {
+                        name: 'Email',
+                        value: 'user',
+                        prop: 'email'
+                    }, {
+                        name: 'Телефон',
+                        value: 'phone'
+                    }, {
+                        name: 'Группы',
+                        value: 'groups',
+                        width: 250,
+                        each: {
+                            prop: 'name',
+                            location: {
+                                href: 'https://vk.com/public',
+                                itemValueColumnId: 'vk_group_id'
+                            }
+                        }
+                    }, {
+                        name: 'Пакеты',
+                        value: 'packages',
+                        each: {
+                            prop: 'name'
+                        }
+                    }, {
+                        name: 'Статус',
+                        value: 'status',
+                        prop: 'name'
+                    }],
+                    hiddenTfoot: true,
+                    actions: [{
+                        name: 'редактировать',
+                        value: 'edit',
+                        colorText: 'text-primary'
+                    }],
+                    defaultFilter: {
+                        name: '№',
+                        value: 'id',
+                        width: 70,
+                        asc: true
+                    },
+                    store: tableStore
+                },
+                formStore
+            };
+        },
+        oncreate(){
+            this.update();
+
+            tableStore.on('state', ({ changed, current }) => {
+                if (changed.trigger) {
+                    var targetId = current.trigger.object.id;
+
+                    if (current.trigger.type == 'edit') {
+                        formStore.set({ current: current.trigger.object });
+                        this.set({ modal: { name: 'Редактирование заказа №'+targetId, component: 'OrderForm' } });
+                    }
+                }
+            });
+
+            formStore.on('state', ({ changed, current }) => {
+                if (changed.isLoad) {
+                    this.update();
+                    formStore.set({ isLoad: false });
+                }
+
+                if(changed.isClose){
+                    this.set({ modal: null });
+                    formStore.set({ isClose: false });
+                }
+            });
+        },
+
+        methods: {
+            update() {
+                var { rights } = this.options.root.get();
+
+                if(rights.Orders.indexOf('all') != -1){
+                    PhalconApi.orders.all().then(orders => {
+                        this.set({ orders });
+                    });
+                } else {
+                    PhalconApi.orders.get().then(orders => {
+                        this.set({ orders });
+                    });
+                }
+            }
+        }
+    }
+</script>

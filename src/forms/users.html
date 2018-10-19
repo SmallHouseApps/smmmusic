@@ -1,0 +1,114 @@
+<div class="row">
+    <div class="col-md-6">
+        <div class="form-group">
+            <label>Имя</label>
+            <input type="text" bind:value="name" class="form-control {validator.name}">
+            {#if validator.name == 'is-invalid'}
+            <div class="invalid-feedback">Поле обязательно к заполнению</div>
+            {/if}
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input id="email" type="email" bind:value="email" class="form-control {validator.email}">
+            {#if validator.email == 'is-invalid'}
+            <div class="invalid-feedback">Неправильный формат email</div>
+            {/if}
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="form-group">
+            <label>Пароль пользователя</label>
+            <input id="password" type="password" bind:value="password" class="form-control {validator.password}">
+            {#if validator.password == 'is-invalid'}
+            <div class="invalid-feedback">Пароль должен быть не менее 6 символов</div>
+            {/if}
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="form-group">
+            <label>Подтвердите пароль</label>
+            <input id="passwordAgree" type="password" bind:value="passwordAgree" class="form-control {validator.passwordAgree}">
+            {#if validator.passwordAgree == 'is-invalid'}
+            <div class="invalid-feedback">Пароли не совпадают</div>
+            {/if}
+        </div>
+    </div>
+    <div class="col-md-12">
+        <div class="form-group">
+            <label>Роль</label>
+            <select id="role_id" class="form-control {validator.role_id}" style="width: 100%" bind:value="role_id">
+                <option value="0" selected>Не выбрана</option>
+                {#each roles as role}
+                <option value="{role.id}">{role.name}</option>
+                {/each}
+            </select>
+            {#if validator.role_id == 'is-invalid'}
+            <div class="invalid-feedback">Выберите роль</div>
+            {/if}
+        </div>
+    </div>
+</div>
+
+<script>
+    import PhalconApi from '../phalconApi.js';
+    
+    export default {
+        data() {
+            return { name: '', email: '', role_id: '', password: '', passwordAgree: '', roles: [], validator: {}, isCorrect: false };
+        },
+
+        onstate({ changed, current, previous }) {
+            console.log(current);
+            if(!changed.isCorrect){ 
+                this.saveForm();
+            }
+		},
+
+        oncreate() {
+            PhalconApi.roles.all().then(roles => {
+                this.set({ roles });
+            });
+        },
+
+        methods: {
+            saveForm() {
+                const { name, email, password, passwordAgree, role_id, formStore } = this.get();
+                
+                var r = /^\w+@\w+\.\w{2,4}$/i;
+                this.isValid(name.length, 'name');
+                this.isValid(r.test(email), 'email');
+                this.isValid(role_id && role_id != '0', 'role_id');
+                this.isValid(password.length == 6, 'password');
+                this.isValid(password == passwordAgree, 'passwordAgree');
+                this.checkFormValid();
+
+                const user = { name, email, role_id, password };
+                const { isCorrect } = this.get();
+
+                formStore.set({ user, isCorrect });
+            },
+
+            isValid(bool, name) {
+                var { validator } = this.get();
+                
+                if(bool) validator[name] = 'is-valid';
+                else validator[name] = 'is-invalid';
+
+                this.set({ validator });
+            },
+
+            checkFormValid() {
+                var { validator, isCorrect } = this.get();
+                
+                isCorrect = true;
+                for(var key in validator) {
+                    if (validator[key] == 'is-invalid') isCorrect = false;
+                }
+
+                this.set({ isCorrect });
+            }
+        }
+    }
+</script>

@@ -1,0 +1,65 @@
+<div class="row">
+    <div class="col-md-6">
+        <div class="form-group">
+            <label>Название</label>
+            <input type="text" bind:value="name" class="form-control">
+            <small class="form-text text-muted">Отображаемое название пакета</small>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="form-group">
+            <label>Цена</label>
+            <input type="number" bind:value="price" class="form-control">
+            <small class="form-text text-muted">Цена пакета</small>
+        </div>
+    </div>
+    <div class="col-md-12">
+        <div class="form-group">
+            <label>ВК-группы</label>
+            <select id="groups" class="js-example-responsive form-control" multiple="multiple" style="width: 100%">
+                {#each groups as group}
+                <option value="{group.id}" selected="{formStore.get().groups && formStore.get().groups.indexOf(group.id) != -1 ? 'selected' : ''}">{group.name}</option>
+                {/each}
+            </select>
+        </div>
+    </div>
+</div>
+
+<script>
+    import PhalconApi from '../phalconApi.js';
+    
+    export default {
+        data() {
+            return { name: '', price: 0, groups: [] };
+        },
+
+        onstate({ changed, current, previous }) {
+            if(current.groups && current.groups.length > 0) this.saveForm();
+		},
+
+        oncreate() {
+            const self = this;
+            
+            PhalconApi.vkGroups.all().then(groups => {
+                this.set({ groups });
+                $('#groups').select2();
+                $('#groups').on('change', function (e) {
+                    self.saveForm();
+                });
+            });
+        },
+
+        methods: {
+            saveForm() {
+                console.log('saveForm');
+                const { name, price, formStore } = this.get();
+                const isCorrect = true;
+                
+                var groups = $('#groups').val();
+                if(!groups || groups.length == 0) groups = formStore.get().groups;
+
+                formStore.set({ name, price, groups, isCorrect });
+            }
+        }
+    }
+</script>

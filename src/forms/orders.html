@@ -1,0 +1,226 @@
+<div class="row">
+    {#if formStore.get().current}
+        <div class="col-md-6">
+            <div class="form-group">
+                <label>Телефон</label>
+                <input type="text" bind:value="phone" class="form-control">
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="form-group">
+                <label>Статус</label>
+                <select id="status" class="form-control">
+                    {#each status as item}
+                    <option value="{item.id}" selected="{formStore.get().current.status_id == item.id ? 'selected' : ''}">{item.name}</option>
+                    {/each}
+                </select>
+            </div>
+        </div>
+        <div class="col-md-12">
+            <div class="form-group">
+                <label>ВК-группы</label>
+                <select id="groups" class="form-control" multiple="multiple" style="width: 100%">
+                    {#each groups as group}
+                    <option value="{group.id}" selected="{formStore.get().groups && formStore.get().groups.indexOf(group.id) != -1 ? 'selected' : ''}">{group.name} {group.price} руб</option>
+                    {/each}
+                </select>
+            </div>
+        </div>
+        <div class="col-md-12">
+            <div class="form-group">
+                <label>Пакеты</label>
+                <select id="packages" class="form-control" multiple="multiple" style="width: 100%">
+                    {#each packages as item}
+                    <option value="{item.id}" selected="{formStore.get().packages && formStore.get().packages.indexOf(item.id) != -1 ? 'selected' : ''}">{item.name} {item.price} руб</option>
+                    {/each}
+                </select>
+            </div>
+        </div>
+        <div class="col-md-12">
+            <p class="text-right">Общая стоимость: <span style="color: red; font-size: 22px;">{Price}₽</span></p>
+        </div>
+    {:else}
+        {#if session && !session.name}
+        <div class="col-md-6">
+            <div class="form-group">
+                <label>Ваше имя</label>
+                <input type="text" bind:value="name" class="form-control">
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="form-group">
+                <label>Ваш email</label>
+                <input type="email" bind:value="email" class="form-control">
+            </div>
+        </div>
+        <div class="col-md-12">
+            <div class="form-group">
+                <label>Пароль</label>
+                <input type="password" bind:value="password" class="form-control">
+            </div>
+        </div>
+        {/if}
+        
+        {#if rights && rights.Orders.indexOf('all') != -1}
+            <div class="col-md-12">
+                <div class="form-group">
+                    <label>Пользователь</label>
+                    <select id="users" class="js-example-responsive form-control" style="width: 100%">
+                        {#each users as user}
+                        <option value="{user.id}">{user.name} {user.email}</option>
+                        {/each}
+                    </select>
+                </div>
+            </div>
+        {/if}
+
+        <div class="col-md-12">
+            <div class="form-group">
+                <label>ВК-группы</label>
+                <select id="groups" class="js-example-responsive form-control" multiple="multiple" style="width: 100%">
+                    {#each groups as group}
+                    <option value="{group.id}" selected="{formStore.get().groups && formStore.get().groups.indexOf(group.id) != -1 ? 'selected' : ''}">{group.name} {group.price} руб</option>
+                    {/each}
+                </select>
+            </div>
+        </div>
+        <div class="col-md-12">
+            <div class="form-group">
+                <label>Пакеты</label>
+                <select id="packages" class="js-example-responsive form-control" multiple="multiple" style="width: 100%">
+                    {#each packages as item}
+                    <option value="{item.id}" selected="{formStore.get().packages && formStore.get().packages.indexOf(item.id) != -1 ? 'selected' : ''}">{item.name} {item.price} руб</option>
+                    {/each}
+                </select>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="form-group">
+                <label>Телефон для связи</label>
+                <input type="phone" bind:value="phone" class="form-control">
+            </div>
+        </div>
+        <div class="col-md-6">
+            <p class="text-right">Общая стоимость: <span style="color: red; font-size: 22px;">{Price}₽</span></p>
+        </div>
+    {/if}
+</div>
+
+<script>
+    import PhalconApi from '../phalconApi.js';
+    
+    export default {
+        data() {
+            return { name: '', email: '', password: '', phone: '', groups: [], packages: [], users: [], status: [] };
+        },
+
+        onstate({ changed, current, previous }) {
+            if(current.groups && current.groups.length > 0) { 
+                this.saveForm(); 
+            }
+		},
+
+        async oncreate() {
+            const self = this;
+            const { formStore } = this.get();
+            const { session, rights } = this.options.root.get();
+            this.set({ session, rights });
+           
+            var { current } = formStore.get();
+            if(current){
+                const groups = current.groups.map(item => {
+                    return item.id;
+                });
+
+                const packages = current.packages.map(item => {
+                    return item.id;
+                });
+
+                this.set({ phone: current.phone });
+                formStore.set({ groups, packages });
+            }
+        
+            await PhalconApi.vkGroups.all().then(groups => {
+                this.set({ groups });
+                $('#groups').select2();
+                $('#groups').on('change', function (e) {
+                    self.set({ groups });
+                });
+            });
+
+            await PhalconApi.packages.all().then(packages => {
+                this.set({ packages });
+                $('#packages').select2();
+                $('#packages').on('change', function (e) {
+                    self.set({ packages });
+                });
+            });
+
+            await PhalconApi.users.all().then(users => {
+                this.set({ users });
+                $('#users').select2();
+                $('#users').on('change', function (e) {
+                    self.set({ users });
+                });
+            });
+
+            await PhalconApi.status.all().then(status => {
+                this.set({ status });
+                $('#status').select2();
+                $('#status').on('change', function (e) {
+                    self.set({ status });
+                });
+            });
+        },
+
+        ondestroy(){
+            const { formStore } = this.get();
+            formStore.set({ current: null, groups: null, packages: null });
+        },
+
+        methods: {
+            saveForm() {
+                const { name, email, password, formStore, phone } = this.get();
+                const id = formStore.get().current ? formStore.get().current.id : null;
+                const isCorrect = true;
+
+                var user = { name, email, password };
+                var user_id = $('#users').val();
+                var status_id = $('#status').val();
+
+                var groups = $('#groups').val();
+                if(!groups || groups.length == 0) groups = formStore.get().groups;
+
+                var packages = $('#packages').val();
+                if(!packages || packages.length == 0) packages = formStore.get().packages;
+
+                const order = { id, status_id, user_id, phone, user, groups, packages };
+
+                formStore.set({ order });
+            }
+        },
+
+        computed: {
+            Price({ groups, packages }){
+                var selectedGroups = $('#groups').val();
+                var selectedPackages = $('#packages').val();
+                var price = 0;
+                
+                groups.map(group => {
+                    if(selectedGroups.indexOf(String(group.id)) != -1) {
+                        price += parseFloat(group.price);
+                    }
+                });
+                
+                packages.map(item => {
+                    if(selectedPackages.indexOf(String(item.id)) != -1) {
+                        price += parseFloat(item.price);
+                    }
+                });
+
+                return price;
+            }
+        }
+    }
+</script>

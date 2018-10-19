@@ -1,0 +1,81 @@
+<div class="col-md-6" style="padding-top: 3px">
+    {#if rights.Users.indexOf('create') != -1}
+    <button type="button" class="btn btn-success" on:click="set({ modal: { name: 'Новый пользователь', component: 'UsersForm' } })">
+        Новый пользователь
+    </button>
+    {/if}
+</div>
+
+<div class="col-md-12">
+    {#if users.length}
+    <Table columns={table.columns} items={users} actions={table.actions} store={table.store} rights={rights.Users} hiddenTfoot={table.hiddenTfoot} />
+    {:else}
+    <h2 class="text-center">--ПУСТО--</h2>
+    {/if}
+
+    {#if modal && modal.component}
+    <Modal title="{modal.name}" component="{modal.component}" formStore={formStore} />
+    {/if}
+</div>
+
+<script>
+    import Modal from './modal.html';
+    import Table from './table.html';
+
+    import PhalconApi from '../phalconApi.js';
+
+    import { Store } from 'svelte/store.js';
+
+    const tableStore = new Store();
+    const formStore = new Store();
+
+    export default {
+        components: { Table, Modal },
+        data() {
+            return {
+                users: [],
+                table: {
+                    columns: [{
+                        name: 'Имя',
+                        value: 'name'
+                    }, {
+                        name: 'email',
+                        value: 'email'
+                    }, {
+                        name: 'Роль',
+                        value: 'role_name'
+                    }],
+                    actions: [{
+                        name: 'редактировать',
+                        value: 'edit'
+                    }],
+                    hiddenTfoot: true,
+                    store: tableStore
+                },
+                formStore
+            };
+        },
+        oncreate() {
+           this.update();
+
+            formStore.on('state', ({ changed, current }) => {
+                if (changed.isLoad) {
+                    this.update();
+                    formStore.set({ isLoad: false });
+                }
+
+                if(changed.isClose){
+                    this.set({ modal: null });
+                    formStore.set({ isClose: false });
+                }
+            });
+        },
+        methods: {
+            update() {
+                PhalconApi.users.all().then(users => {
+                    this.set({ users });
+                });
+            }
+        }
+    }
+</script>

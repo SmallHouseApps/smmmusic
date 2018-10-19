@@ -1,0 +1,335 @@
+<div class="col-md-6" style="padding-top: 3px">
+    {#if rights.VkGroups.indexOf('create') != -1}
+    <button type="button" class="btn btn-success" on:click="set({ modal: { name: 'Новая ВК-группа', component: 'VkGroupsForm' } })">
+        Новая группа
+    </button>
+    {/if}
+
+    {#if rights.VkGroups.indexOf('update') != -1}
+    <button class="btn btn-info" on:click="updateStatistic()" disabled="{vkGroups.length == 0}">
+        Обновить статистику
+    </button>
+    {/if}
+</div>
+
+<div class="col-md-12">
+    {#if vkGroups.length} 
+        {#if loader.isProgress}
+        <div class="progress">
+            <div class="progress-bar progress-bar-striped" role="progressbar" style="width: {(loader.value / loader.max) * 100}%" aria-valuenow="{loader.value}"
+                aria-valuemin="0" aria-valuemax="{loader.max}"></div>
+        </div>
+        {/if}
+        <Table 
+            columns={table.columns} 
+            items={VkGroups} 
+            actions={table.actions} 
+            store={table.store} 
+            rights={rights.VkGroups} 
+            defaultFilter={table.defaultFilter}
+            withCheckbox=true /> 
+        {#if checked.length}
+            {#if rights.Orders.indexOf('create') != -1}
+            <button 
+                type="button" 
+                class="btn btn-outline-success pulse" 
+                style="margin: 5px;" 
+                on:click="set({ modal: { name: 'Новый заказ', component: 'OrderForm' } })"
+            >Оформить заказ</button>
+            {/if}
+            
+            {#if rights.Packages.indexOf('create') != -1}
+            <button 
+                type="button" 
+                class="btn btn-outline-primary" 
+                style="margin: 5px;" 
+                on:click="set({ modal: { name: 'Новый пакет', component: 'PackagesForm' } })"
+            >Создать пакет из выделенных групп</button>
+            {/if}
+        {/if}
+    {:else}
+        <h2 class="text-center">--ПУСТО--</h2>
+    {/if}
+
+    {#if modal && modal.component}
+    <Modal title="{modal.name}" component="{modal.component}" formStore={formStore} />
+    {/if}
+</div>
+
+<script>
+    import Modal from './modal.html';
+    import PhalconApi from '../phalconApi.js';
+    import vkApi from '../vkApi.js';
+    import Table from './table.html';
+    import { Store } from 'svelte/store.js';
+
+    const tableStore = new Store();
+    const formStore = new Store();
+
+    export default {
+        components: { Table, Modal },
+        data() {
+            return {
+                vkGroups: [],
+                checked: JSON.parse(localStorage.getItem('newOrder')) ? JSON.parse(localStorage.getItem('newOrder')).vkGroups : [],
+                filter: null,
+                loader: {
+                    isProgress: false,
+                    value: 0,
+                    max: 100
+                },
+                table: {
+                    columns: [{
+                        name: '',
+                        value: 'avatar',
+                        img: {
+                            width: 100,
+                            height: 100
+                        }
+                    }, {
+                        name: 'Название',
+                        value: 'name',
+                        location: {
+                            href: 'https://vk.com/public',
+                            itemValueColumnId: 'vk_group_id'
+                        }
+                    }, {
+                        name: 'Аудитория',
+                        value: 'members'
+                    }, {
+                        name: 'Охват поста',
+                        value: 'views'
+                    }, {
+                        name: 'Лайков',
+                        value: 'likes'
+                    }, {
+                        name: 'Репостов',
+                        value: 'reposts'
+                    }, {
+                        name: 'Стоимость',
+                        value: 'price',
+                        color: 'red'
+                    }],
+                    actions: [{
+                        name: 'редактировать',
+                        value: 'edit'
+                    }, {
+                        name: 'удалить',
+                        value: 'delete',
+                        colorText: 'danger-text'
+                    }],
+                    defaultFilter: {
+                        name: 'Название',
+                        value: 'name',
+                        location: {
+                            href: 'https://vk.com/public',
+                            itemValueColumnId: 'vk_group_id'
+                        },
+                        asc: true
+                    },
+                    store: tableStore
+                },
+                formStore
+            };
+        },
+
+        onstate({ changed, current, previous }) {
+            // this fires before oncreate, and on every state change.
+            // the first time it runs, `previous` is undefined
+            console.log(changed, current, previous);
+            if (changed.loader) {
+                if (current.loader.value == current.loader.max) {
+                    this.set({
+                        loader: {
+                            isProgress: false,
+                            value: 0,
+                            max: 100
+                        }
+                    })
+
+                    this.options.root.toast('success', 'Статистика обновлена успешно!');
+                }
+            }
+        },
+
+        oncreate() {
+            const { checked, formStore } = this.get();
+
+            tableStore.on('state', ({ changed, current }) => {
+                if (changed.trigger) {
+                    var targetId = current.trigger.object.id;
+                    var { newOrder } = this.options.root.get();
+
+                    if (current.trigger.type == 'delete') this.deleteGroup(targetId);
+
+                    if (current.trigger.type == 'edit') {
+                        formStore.set({ vkGroup: current.trigger.object });
+                        this.set({ modal: { name: 'Редактирование ВК-группы', component: 'VkGroupsForm' } });
+                    }
+
+                    if (current.trigger.type == 'check'){ 
+                        this.checked(targetId)
+
+                        if(newOrder && newOrder.vkGroups){
+                            if(newOrder.vkGroups.indexOf(targetId) == -1){
+                                newOrder.vkGroups.push(targetId);
+                                newOrder.price += current.trigger.object.price;
+                            } else {
+                                newOrder.vkGroups.splice(newOrder.vkGroups.indexOf(targetId), 1);
+                                newOrder.price -= current.trigger.object.price;
+                            }
+                        } else { 
+                            newOrder = {};
+                            newOrder.vkGroups = [targetId];
+                            newOrder.price = current.trigger.object.price
+                        }
+
+                        if((!newOrder.vkGroups || newOrder.vkGroups.length == 0) && (!newOrder.packages || newOrder.packages.length == 0)){
+                            newOrder = null;
+                        }
+                        
+                        this.options.root.set({ newOrder });
+                        localStorage.setItem('newOrder', JSON.stringify(newOrder));
+                        
+                        if(newOrder){
+                            $('#newOrder').css('transform', 'translateY(0)');
+                            setTimeout(function(){
+                                if(newOrder.vkGroups && newOrder.vkGroups.length > 0){
+                                    $('#newOrder').css('transform', 'translateY(72%)');
+                                }
+                            }, 500);
+                        }
+                    }
+                }
+            });
+
+            formStore.on('state', ({ changed, current }) => {
+                if (changed.isLoad) {
+                    this.update();
+                    formStore.set({ isLoad: false });
+                }
+
+                if(changed.isClose){
+                    this.set({ modal: null });
+                    formStore.set({ isClose: false });
+                }
+
+                if(changed.groups){
+                    console.log(changed, current);
+                }
+            });
+
+            if(checked && checked.length > 0){
+                formStore.set({ groups: checked });
+            } else {
+                this.set({ checked: [] });
+            }
+
+            this.update();
+        },
+
+        computed: {
+            VkGroups: ({ vkGroups }) => {
+                var newOrder = JSON.parse(localStorage.getItem('newOrder'));
+                if(newOrder){
+                    vkGroups = vkGroups.map(vkGroup => {
+                        if(newOrder.vkGroups.indexOf(vkGroup.id) != -1){
+                            vkGroup.checked = true;
+                        }
+                        return vkGroup;
+                    });
+                }
+                return vkGroups;
+            }
+        },
+
+        methods: {
+            update() {
+                PhalconApi.vkGroups.all().then(vkGroups => {
+                    this.set({ vkGroups });
+                });
+            },
+            checked(id){
+                var { checked } = this.get();
+                if(checked){
+                    if(checked.indexOf(id) == -1){
+                        checked.push(id);
+                    } else {
+                        checked = checked.filter(checkId => checkId != id);
+                    }
+                } else {
+                    checked = [id];
+                }
+                this.set({ checked });
+                formStore.set({ groups: checked });
+            },
+            deleteGroup(id) {
+                const { vkGroups } = this.get();
+
+                PhalconApi.vkGroups.remove(id).then(status => {
+                    if (status == 200) {
+                        this.options.root.toast('success', 'Группа удалена!');
+                        this.set({ vkGroups: vkGroups.filter((vkGroup => vkGroup.id != id)) });
+                    }
+                });
+            },
+            updateStatistic(){
+                var self = this;
+                var { vkGroups, loader } = this.get();
+
+                loader.max = vkGroups.length;
+                loader.isProgress = true;
+                this.set({ loader });
+
+                vkGroups.forEach(function (vkGroup, index) {
+                    setTimeout(function () {
+                        vkApi.getGroupMembers(vkGroup.vk_group_id).then(async group => {
+                            var data = {};
+
+                            await vkApi.getWallByGroup(vkGroup.vk_group_id).then(wall => {
+                                var likes, views, reposts;
+                                likes = views = reposts = 0;
+                                wall.items.forEach(function (item) {
+                                    likes += item.likes.count;
+                                    views += item.views.count;
+                                    reposts += item.reposts.count;
+                                });
+
+                                data = {
+                                    likes: Math.round(likes / 100),
+                                    views: Math.round(views / 100),
+                                    reposts: Math.round(reposts / 100),
+                                    members: group.count
+                                }
+                            });
+
+                            await PhalconApi.vkGroups.update(vkGroup.id, data).then(data => {
+                                loader.value++;
+                                if (data.status == 200) {
+                                    data = JSON.parse(data.response);
+
+                                    vkGroups = vkGroups.map(vkGroup => {
+                                        if (vkGroup.id == data.id) vkGroup = data;
+                                        return vkGroup;
+                                    });
+
+                                    self.set({ vkGroups, loader });
+                                }
+                            })
+                        });
+                    }, 1000 * index)
+                });
+            }
+        }
+    }
+</script>
+
+<style>
+    .dataTables_wrapper {
+        margin-top: 25px;
+    }
+
+    thead tr th {
+        cursor: pointer;
+    }
+</style>

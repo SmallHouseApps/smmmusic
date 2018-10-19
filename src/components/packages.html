@@ -1,0 +1,101 @@
+<div class="col-md-6" style="padding-top: 3px">
+    {#if rights.Packages.indexOf('create') != -1}
+    <button type="button" class="btn btn-success" on:click="set({ showModal: true })" data-toggle="modal" data-target="#modal">
+        Новый пакет
+    </button>
+    {/if}
+</div>
+
+<div class="col-md-12">
+    {#if packages.length > 0}
+    <Table 
+        columns={table.columns} 
+        items={packages} 
+        actions={table.actions} 
+        store={table.store} 
+        rights={rights.Packages}
+        withCheckbox=true /> 
+    {:else}
+    <h2 class="text-center">--ПУСТО--</h2>
+    {/if}
+
+    {#if showModal}
+    <Modal title="Новый пакет" component="PackagesForm" formStore={formStore} />
+    {/if}
+</div>
+
+<script>
+    import Modal from './modal.html';
+    import Table from './table.html';
+
+    import { Store } from 'svelte/store.js';
+    import PhalconApi from '../phalconApi.js';
+
+    const tableStore = new Store();
+    const formStore = new Store();
+    
+    export default {
+        components: { Modal, Table },
+        data() {
+            return {
+                packages: [],
+                table: {
+                    columns: [{
+                        name: 'Наименование',
+                        value: 'name',
+                        width: 170
+                    }, {
+                        name: 'Цена',
+                        value: 'price'
+                    }, {
+                        name: 'Группы в пакете',
+                        value: 'groups',
+                        width: 250,
+                        each: {
+                            prop: 'name',
+                            location: {
+                                href: 'https://vk.com/public',
+                                itemValueColumnId: 'vk_group_id'
+                            }
+                        }
+                    }, {
+                        name: 'Аудитория',
+                        value: 'groups',
+                        sum: 'members'
+                    }, {
+                        name: 'Охват поста',
+                        value: 'groups',
+                        sum: 'views'
+                    }, {
+                        name: 'Лайков',
+                        value: 'groups',
+                        sum: 'likes'
+                    }, {
+                        name: 'Репостов',
+                        value: 'groups',
+                        sum: 'reposts'
+                    }],
+                    actions: [{
+                        name: 'удалить',
+                        value: 'delete',
+                        colorText: 'danger-text'
+                    }],
+                    store: tableStore
+                },
+                formStore
+            };
+        },
+        oncreate(){
+            console.log(this.options.root);
+            this.update();
+        },
+
+        methods: {
+            update() {
+                PhalconApi.packages.all().then(packages => {
+                    this.set({ packages });
+                });
+            }
+        }
+    }
+</script>

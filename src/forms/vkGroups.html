@@ -1,0 +1,160 @@
+{#if formStore.get().vkGroup}
+    <div class="row">
+        <div class="col-md-4">
+            <img src={formStore.get().vkGroup.avatar} class="circle" style="width: 100%" />
+        </div>
+        <div class="col-md-8">
+            <div class="form-group">
+                <label>Название</label>
+                <input type="text" value="{formStore.get().vkGroup.name}" class="form-control" disabled>
+            </div>
+            <div class="form-group">
+                <label>Стоимость</label>
+                <input type="text" bind:value="formStore.get().vkGroup.price" class="form-control">
+            </div>
+        </div>
+    </div>
+{:else}
+    <ul class="nav nav-tabs">
+    <li class="nav-item">
+        <a class="nav-link" class:active="loadType == 'oneItem'" on:click="set({ loadType: 'oneItem' })">Поштучно</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" class:active="loadType == 'listItem'" on:click="set({ loadType: 'listItem' })">Списком</a>
+    </li>
+    </ul>
+    {#if loadType == 'oneItem'}
+        <div class="form-group">
+            <label>ID ВК-группы</label>
+            <input type="number" bind:value="vkGroupId" on:input="set({ isFetchGroup: false })" class="form-control">
+            <small class="form-text text-muted">Обычно указан в ссылке https://vk.com/public[ID].</small>
+        </div>
+        {#if isFetchGroup}
+        <div class="row">
+            <div class="col-md-4">
+                <img src="{avatar}" alt="..." class="img-thumbnail">
+            </div>
+            <div class="col-md-8">
+                <div class="form-group">
+                    <label>Название</label>
+                    <input type="text" value="{name}" class="form-control" disabled>
+                </div>
+            </div>
+        </div>
+        {:else}
+        <button class="btn btn-primary" on:click="getGroupById()">Получить данные по ВК-группе</button>
+        {/if}
+    {:else}
+        <div class="form-group">
+            <label>Список ссылок ВК-групп</label>
+            <textarea bind:value="vkGroupList" on:input="set({ fetchGroupList: [] })" class="form-control"></textarea>
+            <small class="form-text text-muted">Разделитель между ссылками ПЕРЕНОС СТРОКИ</small>
+        </div>
+        {#if fetchGroupList.length == 0}
+        <button class="btn btn-primary" on:click="getGroupByList()">Получить данные по ВК-группам</button>
+        {:else}
+        <p>
+            Получено {fetchGroupList.length} ВК-групп  
+            <span 
+            class="badge {fetchGroupList.length != vkGroupList.split('\n').length ? 'badge-warning' : 'badge-success'}">
+                {#if fetchGroupList.length != vkGroupList.split('\n').length}
+                Подгружаем...
+                {:else}
+                Готово
+                {/if}
+            </span>
+        </p>
+        <div class="progress">
+            <div class="progress-bar" role="progressbar" style="width: {(fetchGroupList.length / vkGroupList.split('\n').length) * 100}%" aria-valuenow="{fetchGroupList.length}" aria-valuemin="0" aria-valuemax="{vkGroupList.split('\n').length}"></div>
+        </div>
+        <ul class="list-group" ref:fetchGroupListEl>
+            {#each fetchGroupList as fetchGroup}
+            <li class="list-group-item">
+                <div class="row">
+                    <div class="col-md-4">
+                        <img src="{fetchGroup.avatar}" alt="..." class="img-thumbnail">
+                    </div>
+                    <div class="col-md-8">
+                        <div class="form-group">
+                            <label>Название</label>
+                            <input type="text" value="{fetchGroup.name}" class="form-control" disabled>
+                        </div>
+                    </div>
+                </div>
+            </li>
+            {/each}
+        </ul>
+        {/if}
+    {/if}
+{/if}
+
+<script>
+    import vkApi from '../vkApi.js';
+
+	export default {
+        data() {
+			return {
+                vkGroupId: '',
+                loadType: 'oneItem',
+                fetchGroupList: []
+			};
+        },
+        
+        methods: {
+			getGroupById() {
+                var self = this;
+                var { vkGroupId, formStore } = this.get();
+                console.log(vkGroupId);
+                
+                vkApi.getGroupById(vkGroupId).then(group => {
+                    const name = group.name;
+                    const screenName = group.screen_name;
+                    const avatar = group.photo_200;
+                        
+                    self.set({ name, screenName, avatar, isFetchGroup: true });
+                    formStore.set({ vkGroupId, name, screenName, avatar });
+                })
+            },
+            
+            getGroupByList(){
+                var self = this;
+                var { vkGroupList, fetchGroupList, formStore } = this.get();
+                var vkGroupArr = vkGroupList.split('\n'); 
+                
+                vkGroupArr.forEach(function(el, index){
+                    setTimeout(function(){
+                        var vkGroupId = el.split('public')[1] ? el.split('public')[1] : el.split('club')[1];
+                        vkApi.getGroupById(vkGroupId).then(group => {
+                            var name = group.name;
+                            var screenName = group.screen_name;
+                            var avatar = group.photo_200;
+                                
+                            fetchGroupList.push({ vkGroupId, name, screenName, avatar});
+                            self.set({ fetchGroupList });
+                            self.refs.fetchGroupListEl.scrollTo(0,self.refs.fetchGroupListEl.scrollHeight);
+                            formStore.set({ fetchGroupList, isCorrect: true });
+                        })
+                    }, 500 * index);
+                });
+                
+            }
+		}
+	};
+</script>
+
+<style>
+    .nav-tabs,
+    .progress{
+        margin-bottom: 15px;
+    }
+
+    .nav-item{
+        cursor: pointer;
+    }
+
+    .list-group{
+        height: 300px;
+        overflow-y: scroll;
+    }
+    
+</style>

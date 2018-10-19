@@ -1,0 +1,273 @@
+<div class="table-responsive">
+    <table class="table table-sm">
+        <thead>
+            <tr>
+                {#if withCheckbox}
+                <th style="width: 55px">
+                    <input type="checkbox" on:click="selectAll()" checked="{CheckedCount == items.length}"/>
+                </th>
+                {/if}
+                {#each columns as column}
+                <th on:click="filter(column)" style="width: {column.width}px">
+                    <div>
+                        {column.name}
+                        {#if filter == column.value + (column.sum ? column.sum : '') + (column.each ? column.each.prop : '') + (column.prop ? column.prop : '')}
+                        <i class="material-icons filter-icon">filter_list</i> 
+                        {:elseif filter == column.value + (column.sum ? column.sum : '') + (column.each ? column.each.prop : '') + (column.prop ? column.prop : '') + '-desc'}
+                        <i class="material-icons filter-icon" style="transform:rotateX(180deg)">filter_list</i> 
+                        {/if}
+                    </div>
+                </th>
+                {/each}
+                {#if actions}
+                <th style="width: {50*actions.length}px"></th>
+                {/if}
+            </tr>
+        </thead>
+        <tbody>
+            {#each items as item}
+            <tr onclick="$(this).find('#check').trigger('click')" data-checked="{item.checked}">
+                {#if withCheckbox}
+                <td class="align-middle" style="width: 55px">
+                    <input type="checkbox" id="check" onclick="event.stopPropagation()" on:click="setTrigger(event, 'check', item)" bind:checked=item.checked/>
+                </td>
+                {/if}
+                {#each columns as column}
+                <td class="align-middle" style="width: {column.width}px; color: {column.color}">
+                    {#if column.location}
+                        <a href="{column.location.href}{item[column.location.itemValueColumnId]}" target="_blank">{item[column.value] || 'Нет данных'}</a>
+                    {:elseif column.count}
+                        {item[column.value].length || 'Нет данных'}
+                    {:elseif column.img}
+                        <img src={item[column.value]} class="circle" width={column.img.width} height={column.img.height} />
+                    {:elseif column.sum}
+                        {item[column.value].sum(column.sum) || 'Нет данных'}
+                    {:elseif column.each}
+                        {#each item[column.value] as subItem}
+                            {#if column.each.location}
+                            <a href="{column.each.location.href}{subItem[column.each.location.itemValueColumnId]}" target="_blank" class="badge badge-pill badge-primary" style="margin-right: 5px; margin-bottom: 5px;">{subItem[column.each.prop]}</a>
+                            {:else}
+                            <span class="badge badge-pill badge-primary">{subItem[column.each.prop] || 'Нет данных'}</span>
+                            {/if}
+                        {/each}
+                    {:elseif column.prop}
+                        {item[column.value] ? item[column.value][column.prop] : 'Нет данных'}
+                    {:else}
+                        {item[column.value] || 'Нет данных'}
+                    {/if}
+                </td>
+                {/each}
+                {#if actions}
+                <td class="align-middle" style="width: {50*actions.length}px">
+                    {#each actions as action}
+                        {#if rights.indexOf(action.value) != -1}
+                        <i class="material-icons text-primary pointer {action.colorText}" on:click="setTrigger(event, action.value, item)" id="{item.id}-{action.value}-btn" title="{action.name}">
+                            {action.value}
+                        </i>
+                        {/if}
+                    {/each}
+                </td>
+                {/if}
+            </tr>
+            {/each}
+        </tbody>
+        {#if !hiddenTfoot || typeof(hiddenTfoot) == 'undefined'}
+        <tfoot>
+            <tr>
+                {#if withCheckbox}
+                <th style="width: 55px">
+                    {CheckedCount > 0 ? 'Выделено:'+CheckedCount : 'Итого'}
+                </th>
+                {/if}
+                {#each columns as column}
+                <th on:click="filter(column)" style="width: {column.width}px">
+                    {#if !column.hiddenTfoot}
+                    <div>
+                        {#if CheckedCount > 0}
+                            {items.sum(column.value, true) ? items.sum(column.value, true).toFixed(2).replace(/(\d)(?=(\d{3})+\.)/g, "$1 ").replace('.', ',') : ''}
+                        {:else}
+                            {items.sum(column.value) ? items.sum(column.value).toFixed(2).replace(/(\d)(?=(\d{3})+\.)/g, "$1 ").replace('.', ',') : ''}
+                        {/if}
+                    </div>
+                    {/if}
+                </th>
+                {/each}
+                {#if actions}
+                <th style="width: {50*actions.length}px"></th>
+                {/if}
+            </tr>
+        </tfoot>
+        {/if}
+    </table>
+</div>
+
+<style>
+    thead tr th div{
+        cursor: pointer;
+        position: relative;
+        padding-right: 25px;
+    }
+    .filter-icon{
+        right: 0; top: 0;
+        position: absolute;
+        padding-left: 5px;
+    }
+    tbody {
+        display:block;
+        height:60vh;
+        overflow:auto;
+    }
+    thead, tfoot, tbody tr {
+        display:table;
+        width:1090px;
+        table-layout:fixed;
+    }
+    thead, tfoot {
+        width: calc( 1090px - 1em )
+    }
+    tbody tr {
+        transition: background-color 250ms;
+    }
+    
+    tbody tr:hover{
+        background-color: rgba(0,0,0,0.05);
+    }
+</style>
+
+<script>
+    Array.prototype.sum = function (prop, checked = false) {
+        var total = 0;
+        for ( var i = 0, _len = this.length; i < _len; i++ ) {
+            if(checked){
+                if(this[i]['checked'])
+                    total += parseFloat(this[i][prop]);
+            } else {
+                total += parseFloat(this[i][prop]);
+            }
+        }
+        return total;
+    }
+
+    export default {
+        data() {
+            return {
+                filter: null,
+            };
+        },
+
+        onstate({ changed, current, previous }) {
+			if (changed.items && !changed.filter) {
+				this.update();
+			}
+		},
+
+        oncreate() {
+            const self = this;
+            this.update();
+        },
+
+        ondestroy() {
+            //console.log(this);
+        },
+
+        computed: {
+            CheckedCount: ({ items }) => {
+                var CheckedCount = 0;
+                items.map(item => {
+                    if(item.checked) CheckedCount++;
+                });
+
+                return CheckedCount;
+            }
+        },
+
+        methods: {
+            update() {
+                const { defaultFilter } = this.get();
+                
+                if(defaultFilter){
+                    if(defaultFilter.desc){
+                        this.filter(defaultFilter);
+                    } else {
+                        this.filter(defaultFilter);
+                        this.filter(defaultFilter);
+                    }
+                }
+            },
+            filter(column) {
+                if(column.name){
+                    var subProp = '';
+                    if(column.sum) subProp = column.sum;
+                    if(column.prop) subProp = column.prop;
+                    if(column.each && column.each.prop) subProp = column.each.prop;
+                    const { items, filter } = this.get();
+
+                    if (filter && filter == column.value + subProp) {
+                        this.set({ items: items.sort((a, b) => {
+                            if(column.sum){
+                                a = a[column.value].sum(subProp); b = b[column.value].sum(subProp);
+                            } else if (column.each) {
+                                a = a[column.value].length; b = b[column.value].length;
+                            } else if (column.prop) {
+                                a = a[column.value][column.prop]; b = b[column.value][column.prop];
+                            } else {
+                                a = a[column.value]; b = b[column.value];
+                            }
+
+                            if(parseFloat(a)) a = parseFloat(a);
+                            if(parseFloat(b)) b = parseFloat(b);
+
+                            return a > b;
+                        }), filter: column.value + subProp + '-desc', defaultFilter: column });
+                    } else {
+                        this.set({ items: items.sort((a, b) => {  
+                            if(column.sum){
+                                a = a[column.value].sum(subProp); b = b[column.value].sum(subProp);
+                            } else if (column.each) {
+                                a = a[column.value].length; b = b[column.value].length;
+                            } else if (column.prop) {
+                                a = a[column.value][column.prop]; b = b[column.value][column.prop];
+                            } else {
+                                a = a[column.value]; b = b[column.value];
+                            }
+
+                            if(parseFloat(a)) a = parseFloat(a);
+                            if(parseFloat(b)) b = parseFloat(b);
+
+                            return a < b;
+                        }), filter: column.value + subProp, defaultFilter: column });
+                    }
+                }
+            },
+            setTrigger(event, type, object) {
+                if(type != 'check') event.stopPropagation();
+                
+                const { store } = this.get();
+                store.set({ 
+                    trigger: { type, object } 
+                });
+            },
+            selectAll(){
+                var hasItemNoneChecked = false;
+                $('tbody tr').each(function(index, el){
+                    if($(el).attr('data-checked') != 'true') hasItemNoneChecked = true;
+                });
+
+                $('tbody tr').each(function(index, el){
+                    if(hasItemNoneChecked){
+                        if($(el).attr('data-checked') != 'true') $(el).trigger('click');
+                    } else {
+                        $(el).trigger('click');
+                    }
+                });
+            },
+            propSum(arrObj, prop) {
+                var total = 0
+                for (var i = 0;  i < arrObj.length; i++) {
+                    total += arrObj[i][prop];
+                }
+                return total
+            }
+        }
+    }
+</script>
