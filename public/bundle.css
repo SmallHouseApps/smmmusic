@@ -1,0 +1,7 @@
+nav.svelte-13e2uxn{margin-bottom:25px}#newOrder.svelte-13e2uxn{position:fixed;bottom:15px;right:15px;width:250px;transition:transform 250ms;transform:translateY(72%)}#newOrder.svelte-13e2uxn:hover{transform:translateY(0) !important}
+.modal-header.svelte-1bs5evu{border-bottom:0;padding-bottom:0}
+thead.svelte-im5gfu tr th div.svelte-im5gfu{cursor:pointer;position:relative;padding-right:25px}.filter-icon.svelte-im5gfu{right:0;top:0;position:absolute;padding-left:5px}tbody.svelte-im5gfu{display:block;height:60vh;overflow:auto}thead.svelte-im5gfu,tfoot.svelte-im5gfu,tbody.svelte-im5gfu tr.svelte-im5gfu{display:table;width:1090px;table-layout:fixed}thead.svelte-im5gfu,tfoot.svelte-im5gfu{width:calc( 1090px - 1em )
+    }tbody.svelte-im5gfu tr.svelte-im5gfu{transition:background-color 250ms}tbody.svelte-im5gfu tr.svelte-im5gfu:hover{background-color:rgba(0,0,0,0.05)}
+.nav-tabs.svelte-uzvduc,.progress.svelte-uzvduc{margin-bottom:15px}.nav-item.svelte-uzvduc{cursor:pointer}.list-group.svelte-uzvduc{height:300px;overflow-y:scroll}
+
+/*# sourceMappingURL=bundle.css.map */
